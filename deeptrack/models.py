@@ -517,8 +517,6 @@ class cgan(Model):
         assemble_loss=None,
         assemble_optimizer=None,
         assemble_loss_weights=None,
-	d_loss=0,
-	g_loss=0
         **kwargs
     ):
 
@@ -597,7 +595,6 @@ class cgan(Model):
                 d_loss_real = self.discriminator.train_on_batch([labels, data], valid)
                 d_loss_fake = self.discriminator.train_on_batch([gen_imgs, data], fake)
                 d_loss += 0.5 * np.add(d_loss_real, d_loss_fake)
-		self.d_loss += d_loss
 
                 # ---------------------
                 #  Train Generator
@@ -605,7 +602,6 @@ class cgan(Model):
 
                 # Train the generator (to have the discriminator label samples as valid)
                 g_loss += np.array(self.assemble.train_on_batch(data, [valid, labels]))
-		self.g_loss += g_loss
 
                 # Plot the progress
 
@@ -613,8 +609,6 @@ class cgan(Model):
                 data_generator.on_epoch_end()
             except:
                 pass
-	    self.g_loss /= steps
-	    self.d_loss /= steps
 
             print(
                 "%d [D loss: %f, acc.: %.2f%%] [G loss: %f, %f, %f]"

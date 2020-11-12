@@ -31,6 +31,7 @@ class Generator(keras.utils.Sequence):
         self,
         feature,
         label_function=None,
+        label_is_list=False,
         batch_function=lambda image: image,
         batch_size=1,
         repeat_batch=1,
@@ -101,7 +102,14 @@ class Generator(keras.utils.Sequence):
                         self._shuffle(sub_batch, sub_labels)
 
                     sub_batch = np.array(sub_batch)
-                    sub_labels = np.array(sub_labels)
+                    if label_is_list:
+                        ld=[ [] for _ in range(len(sub_labels[0]))]
+                        for i in range(batch_size):
+                            for j in range(len(sub_labels[0])):
+                                ld[j].append(sub_labels[i][j])
+                        sub_labels=ld
+                    else:
+                        sub_labels = np.array(sub_labels)
 
                     # Console found batch_size with results
                     if sub_batch.ndim > ndim:
