@@ -621,3 +621,99 @@ class cgan(Model):
                     g_loss[2] / steps,
                 )
             )
+
+def resnetcnn(input_shape=(None, None, 1),
+            conv_layers_dimensions=(16, 32, 64, 128),
+            upsample_layers_dimensions=(64, 128),
+            base_conv_layers_dimensions=(128, 128),
+            output_conv_layers_dimensions=(16, 16),
+            dropout=(),
+            pooldim=2,
+            steps_per_pooling=1,
+            number_of_outputs=1,
+            output_activation=None,
+            loss=nd_mean_absolute_error,
+            layer_function=None,
+            BatchNormalization=False,
+            conv_step=None,
+            **kwargs):
+    """Creates and compiles a U-Net.
+
+    Parameters
+    ----------
+    input_shape : tuple of ints
+        Size of the images to be analyzed.
+    conv_layers_dimensions : tuple of ints
+        Number of convolutions in each convolutional layer during down-
+        and upsampling.
+    base_conv_layers_dimensions : tuple of ints
+        Number of convolutions in each convolutional layer at the base
+        of the unet, where the image is the most downsampled.
+    output_conv_layers_dimensions : tuple of ints
+        Number of convolutions in each convolutional layer after the
+        upsampling.
+    steps_per_pooling : int
+        Number of convolutional layers between each pooling and upsampling
+        step.
+    number_of_outputs : int
+        Number of convolutions in output layer.
+    output_activation : str or keras activation
+        The activation function of the output.
+    loss : str or keras loss function
+        The loss function of the network.
+    layer_function : Callable[int] -> keras layer
+        Function that returns a convolutional layer with convolutions
+        determined by the input argument. Can be use to futher customize the network.
+
+    Returns
+    -------
+    keras.models.Model 
+        Deep learning network.
+    """
+
+    if conv_step is None:
+        def conv_step(layer,dimensions):
+            layer=layers.Conv2D(dimensions,kernel_size=1,activation="relu",padding="same")(layer)
+            layern=layers.Conv2D(dimensions,kernel_size=3,activation="relu",padding="same")(layer)
+
+            layern=layers.Conv2D(dimensions,kernel_size=3,activation="relu",padding="same")(layern)
+            layer=layers.Add()([layer,layern])
+            return layer
+        
+    resnet_input = layers.Input(input_shape)
+
+    layer = resnet_input
+
+    # Downsampling step
+    layer=layers.Conv2D(16,kernel_size=7,activation="relu",padding="same")(layer)
+    
+    for conv_layer_dimension in conv_layers_dimensions:
+        for _ in range(steps_per_pooling):
+            layer = conv_step(layer,conv_layer_dimension)
+            
+        layer = layers.MaxPooling2D(pooldim)(layer)
+
+    # Base steps
+    for conv_layer_dimension in base_conv_layers_dimensions:
+        layer = conv_step(layer,conv_layer_dimension)
+    
+    output=layers.Conv2D(number_of_outputs,kernel_size=3,activation=output_activation,padding="same")(layer)
+    mask=layers.Conv2D(1,kernel_size=3,padding="same")(layer)
+    mask1=layers.Lambda(lambda x: activations.sigmoid(x))(mask)
+    #
+    mask=layers.Lambda(lambda x: layers.Multiply()([x,1/backend.sum(x,axis=(1,2))]))(mask1)#layers.Softmax(axis=(-3,-2))(mask)
+    
+    mask=layers.Lambda(lambda x: backend.repeat_elements(x,number_of_outputs,axis=-1))(mask)
+    output=layers.Multiply()([output,mask])
+    #output=layers.GlobalAveragePooling2D()(output)
+    #output = conv_step(output,conv_layer_dimension)
+    #output=layers.Conv2D(number_of_outputs,kernel_size=3,activation=output_activation,padding="same")(output)
+    
+    outp1=layers.Concatenate(axis=-1)([output,mask1])
+    output=layers.Lambda(lambda x: backend.sum(x,axis=(1,2)))(output)
+    #output=layers.Flatten()(output)
+    model = models.Model(inputs=resnet_input, outputs=[output,outp1])
+
+    
+    
+    return _compile(model, loss="mae", **kwargs)

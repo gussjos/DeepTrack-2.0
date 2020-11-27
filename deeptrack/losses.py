@@ -113,6 +113,32 @@ def weighted_crossentropy(weight=(1, 1), eps=1e-4):
 
     return unet_crossentropy
 
+def unet_features(weight=(9,1,.1),num_features=1,squeeze=None):
+    
+    
+    def get_loss(y_true,y_pred):
+        if squeeze is not None:
+            y_pred=K.squeeze(y_pred,axis=squeeze)
+        T = K.flatten(y_true[:,:,:,0])
+        a=K.flatten(y_pred[:,:,:,0])
+        #a=K.clip(a,-30,30)
+        #P = 1 / (1 + K.exp(-a))
+        P=a
+        error=K.abs(T-P)
+        loss=-K.mean(weight[0] * T * K.log(P + 1E-4) + weight[1] * (1 - T) * K.log(1 - P + 1E-4))#+K.sum(T * error) / (K.sum(T) + 1e-6) +  K.sum(error * (1-T)) / (K.sum(1-T) + 1e-6)
+        for i in range(num_features):
+
+
+            T1 = K.flatten(y_true[:,:,:,i+1])
+            P1 = K.flatten(y_pred[:,:,:,i+1])
+            error=K.abs(T1-P1)
+            f_loss=K.sum(T * error) / (K.sum(T) + 1e-6) +  K.sum(error * (1-T)) / (K.sum(1-T) + 1e-6)
+            loss+=weight[2]*f_loss
+
+
+        return loss
+    return get_loss
+
 
 # Wrap standard keras loss function with flatten.
 for keras_loss_function in _COMPATIBLE_LOSS_FUNCTIONS:
