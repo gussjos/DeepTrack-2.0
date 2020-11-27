@@ -15,8 +15,7 @@ RNN, rnn
 from deeptrack.losses import nd_mean_absolute_error
 from deeptrack.features import Feature
 from deeptrack.layers import as_block
-from tensorflow.keras import activations
-from tensorflow.keras import models, layers, optimizers
+from tensorflow.keras import models, layers, optimizers, backend, activations
 import numpy as np
 import warnings
 
